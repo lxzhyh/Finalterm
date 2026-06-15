@@ -1,0 +1,56 @@
+# Experiment 2: ACT trained on CALVIN Env-A + B + C (joint)
+# Same architecture and hyperparameters as act_A_only — only training data differs
+
+dataset:
+  repo_id: calvin_ABC_train
+  root_dir: ./data/lerobot_calvin
+
+policy:
+  type: act
+  device: cuda
+  vision_encoder:
+    pretrained: true
+    freeze: false
+  decoder:
+    n_decoder_layers: 4
+    n_heads: 8
+    d_model: 512
+    dim_feedforward: 3200
+    dropout: 0.1
+    activation: relu
+  cvae:
+    latent_dim: 32
+    kl_weight: 10.0
+  chunk_size: 100
+  input_keys:
+    - observation.images.static
+    - observation.images.gripper
+    - observation.state
+  output_key: action
+
+training:
+  batch_size: 8
+  steps: 100000
+  optimizer: AdamW
+  learning_rate: 1.0e-4
+  weight_decay: 0.0
+  lr_scheduler: cosine
+  warmup_steps: 500
+  grad_clip_norm: 10.0
+  loss: l1
+  save_checkpoint: true
+  checkpoint_interval: 10000
+  save_best_metric: val_action_l1_loss
+
+logging:
+  wandb:
+    enable: true
+    project: act-calvin
+    group: exp2_multi_env
+    name: act_ABC_joint_seed42
+  log_interval: 50
+  eval_interval: 5000
+
+seed: 42
+output_dir: outputs/train/act_ABC_joint_seed42
+job_name: act_ABC_joint_seed42

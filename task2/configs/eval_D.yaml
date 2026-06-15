@@ -1,0 +1,23 @@
+# Env-D Zero-shot Evaluation Config
+
+evaluation:
+  test_env: D
+  dataset_path: ./data/lerobot_calvin/calvin_D_test
+  num_sequences: 100
+  seed: 42
+
+# ACT inference with action chunking
+inference:
+  chunk_size: 100
+  # Re-query policy when chunk buffer exhausted
+  temporal_ensemble: false     # set true for smoothed ensemble averaging
+
+# Checkpoints to evaluate
+checkpoints:
+  - name: act_A_only
+    path: outputs/train/act_A_only_seed42/checkpoints/best_model.pt
+  - name: act_ABC_joint
+    path: outputs/train/act_ABC_joint_seed42/checkpoints/best_model.pt
+
+# Output
+output_dir: outputs/eval

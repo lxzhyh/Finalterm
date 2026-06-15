@@ -1,0 +1,27 @@
+# Outputs (large files)
+outputs/train/*/checkpoints/*.pt
+outputs/train/*/checkpoints/*.safetensors
+outputs/train/*/videos/
+data/
+third_party/calvin/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# WandB
+wandb/
+
+# Logs
+*.log
