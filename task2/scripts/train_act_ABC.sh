@@ -21,6 +21,8 @@ lerobot-train \
   --dataset.root="data/lerobot_calvin/calvin_ABC_train" \
   --policy.type=act \
   --policy.device=cuda \
+  --policy.push_to_hub=false \
+  --policy.repo_id="local/act_ABC_joint_seed42" \
   --output_dir="${OUTPUT_DIR}" \
   --job_name=act_ABC_joint_seed42 \
   --batch_size=8 \

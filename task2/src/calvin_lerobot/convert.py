@@ -171,12 +171,14 @@ def read_calvin_episode(ep_info: EpisodeInfo) -> dict:
             with open(lang_path, "rb") as f:
                 lang_data = pickle.load(f)
             if isinstance(lang_data, dict):
-                # CALVIN format: {ind: {lang: [annotations]}}
+                # CALVIN format: {frame_idx: {"lang": [annotations]}}
+                # Just take the first annotation as the episode task
                 for ind_data in lang_data.values():
                     if isinstance(ind_data, dict) and "lang" in ind_data:
-                        language.extend(ind_data["lang"])
+                        language = [ind_data["lang"][0]]
+                        break
             elif isinstance(lang_data, (list, tuple)):
-                language.extend([str(x) for x in lang_data])
+                language = [str(lang_data[0])] if lang_data else []
             break
 
     if not language:
