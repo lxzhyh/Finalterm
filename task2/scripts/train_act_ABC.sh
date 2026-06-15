@@ -7,7 +7,7 @@
 # Usage: bash scripts/train_act_ABC.sh
 set -euo pipefail
 
-OUTPUT_DIR="outputs/train/act_ABC_joint"
+OUTPUT_DIR="outputs/train/act_ABC_joint_seed42"
 mkdir -p "${OUTPUT_DIR}"
 
 echo "=== Training ACT on CALVIN Env-A/B/C (multi-environment) ==="
@@ -17,12 +17,12 @@ echo ""
 
 # LeRobot 0.4.4 CLI parameters (verified via lerobot-train --help)
 lerobot-train \
-  --dataset.repo_id=calvin_ABC \
-  --dataset.root="data/lerobot_calvin/calvin_ABC" \
+  --dataset.repo_id=calvin_ABC_train \
+  --dataset.root="data/lerobot_calvin/calvin_ABC_train" \
   --policy.type=act \
   --policy.device=cuda \
   --output_dir="${OUTPUT_DIR}" \
-  --job_name=act_ABC_joint \
+  --job_name=act_ABC_joint_seed42 \
   --batch_size=8 \
   --steps=100000 \
   --seed=42 \

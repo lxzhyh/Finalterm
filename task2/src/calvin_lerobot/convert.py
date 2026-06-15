@@ -412,6 +412,41 @@ def main():
     gripper_hw = tuple(args.gripper_size)
 
     for split_name in args.splits:
+        # Special handling for debug split
+        if split_name == "debug":
+            print(f"\n{'='*60}")
+            print(f"Processing split: debug (all environments, small subset)")
+            print(f"{'='*60}")
+
+            # For debug, use all train envs (A, B, C) with small episode count
+            splits = splitter.split(
+                calvin_root=Path(args.calvin_root),
+                train_envs=["A", "B", "C"],
+                test_env="D",
+                max_episodes_per_env=5,  # Small subset for debug
+            )
+            episodes = splits["train"]
+            repo_id = "calvin_debug"
+
+            if not episodes:
+                print(f"  No episodes found for debug split, skipping")
+                continue
+
+            print(f"\nConverting {len(episodes)} episodes -> {repo_id}")
+            convert_episodes(
+                episodes=episodes,
+                repo_id=repo_id,
+                output_root=output_root,
+                static_hw=static_hw,
+                gripper_hw=gripper_hw,
+                fps=args.fps,
+            )
+
+            if not args.skip_verify:
+                verify_dataset(repo_id, output_root)
+            continue
+
+        # Regular split handling
         envs = list(split_name)
         is_test_only = (split_name == "D")
 

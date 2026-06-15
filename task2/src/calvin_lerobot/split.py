@@ -239,10 +239,17 @@ class EpisodeSplitter:
                     pass
 
         # Fallback: use episode index for round-robin assignment
-        # This ensures roughly equal distribution across environments
+        # WARNING: This is a heuristic and may not reflect true environment labels
         ep_num = self._extract_episode_number(ep_dir.name)
         env_list = list(envs)
-        return env_list[ep_num % len(env_list)]
+        assigned_env = env_list[ep_num % len(env_list)]
+
+        # Log first few assignments for verification
+        if ep_num < 10:
+            print(f"    [WARNING] No metadata found for {ep_dir.name}, "
+                  f"assigned to Env-{assigned_env} (modulo assignment)")
+
+        return assigned_env
 
     def _infer_source_split(self, ep_dir: Path, calvin_root: Path) -> str:
         """Get the CALVIN split name from the path."""
