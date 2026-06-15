@@ -6,7 +6,7 @@ The exact API signatures may vary between versions. Run the verification
 step below after installation to confirm:
 
     python -c "
-    from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+    from lerobot.datasets.lerobot_dataset import LeRobotDataset
     import inspect
     print(inspect.signature(LeRobotDataset.create))
     "
@@ -63,7 +63,9 @@ def discover_lerobot_api():
     api_info = {"available": False, "methods": {}, "errors": []}
 
     try:
-        from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+        # LeRobot 0.4.4 uses: lerobot.datasets.lerobot_dataset
+        # (not lerobot.common.datasets.lerobot_dataset as in 0.5.x)
+        from lerobot.datasets.lerobot_dataset import LeRobotDataset
         api_info["available"] = True
         api_info["class"] = LeRobotDataset
 
@@ -216,7 +218,7 @@ def define_features(
 
     IMPORTANT: Verify these match your LeRobot version's expected format.
     Check with:
-        from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+        from lerobot.datasets.lerobot_dataset import LeRobotDataset
         ds = LeRobotDataset("some_existing_dataset")
         print(ds.features)
     """
@@ -261,7 +263,7 @@ def convert_episodes(
         gripper_hw: gripper camera image size (H, W)
         fps: frames per second
     """
-    from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+    from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
     features = define_features(static_hw, gripper_hw, fps=fps)
     output_dir = output_root / repo_id
@@ -321,7 +323,7 @@ def verify_dataset(repo_id: str, output_root: Path):
     This is a critical check — if this fails, the training pipeline
     will also fail.
     """
-    from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+    from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
     output_dir = output_root / repo_id
 

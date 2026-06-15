@@ -19,21 +19,17 @@ mkdir -p "${OUTPUT_DIR}"
 echo "=== Smoke Test: 200 steps, batch_size=2 ==="
 echo ""
 
-# IMPORTANT: Before running, verify CLI params with:
-#   lerobot-train --help
-#
-# The parameters below are based on LeRobot documentation.
-# If they don't match your version, adjust accordingly.
-
+# LeRobot 0.4.4 CLI parameters (verified via lerobot-train --help)
 lerobot-train \
   --dataset.repo_id=calvin_debug \
   --dataset.root="data/lerobot_calvin/calvin_debug" \
   --policy.type=act \
+  --policy.device=cuda \
   --output_dir="${OUTPUT_DIR}" \
   --job_name=debug_act \
-  --policy.device=cuda \
-  --training.steps=200 \
-  --training.batch_size=2 \
+  --batch_size=2 \
+  --steps=200 \
+  --seed=42 \
   --wandb.enable=false \
   2>&1 | tee "${OUTPUT_DIR}/train.log"
 

@@ -38,19 +38,19 @@ def load_policy(checkpoint_dir: str, device: torch.device) -> "ACTPolicy":
         config.json, model.safetensors (or .pt), etc.
 
     Loading method (verify with your version):
-        from lerobot.common.policies.act.modeling_act import ACTPolicy
+        from lerobot.policies.act.modeling_act import ACTPolicy
         policy = ACTPolicy.from_pretrained(checkpoint_dir)
 
     If the import path differs, try:
         python -c "
-        import lerobot.common.policies as p
+        import lerobot.policies as p
         import pkgutil
         print([m.name for m in pkgutil.iter_modules(p.__path__)])
         "
     """
     # Try standard LeRobot loading
     try:
-        from lerobot.common.policies.act.modeling_act import ACTPolicy
+        from lerobot.policies.act.modeling_act import ACTPolicy
         policy = ACTPolicy.from_pretrained(checkpoint_dir)
         policy.to(device)
         policy.eval()
@@ -61,7 +61,7 @@ def load_policy(checkpoint_dir: str, device: torch.device) -> "ACTPolicy":
 
     # Fallback: try loading from checkpoint directory
     try:
-        from lerobot.common.policies.act.modeling_act import ACTPolicy
+        from lerobot.policies.act.modeling_act import ACTPolicy
         ckpt_path = Path(checkpoint_dir)
 
         # Look for model file in checkpoint dir
@@ -78,7 +78,7 @@ def load_policy(checkpoint_dir: str, device: torch.device) -> "ACTPolicy":
             import json
             with open(config_file) as f:
                 config_dict = json.load(f)
-            from lerobot.common.policies.act.configuration import ACTConfig
+            from lerobot.policies.act.configuration_act import ACTConfig
             config = ACTConfig(**config_dict)
             policy = ACTPolicy(config)
             # Load weights
@@ -128,7 +128,7 @@ def offline_evaluate(
     Returns:
         dict of evaluation metrics
     """
-    from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+    from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
     # Load dataset
     ds = LeRobotDataset(dataset_repo_id, root=dataset_root)
