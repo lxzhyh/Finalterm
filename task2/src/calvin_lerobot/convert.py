@@ -1,278 +1,482 @@
 """
-Convert CALVIN raw episodes to LeRobotDataset v3 format.
+Convert CALVIN raw episodes to LeRobotDataset format using official API.
 
-LeRobotDataset v3 structure:
-    dataset_root/
-    ├── meta/
-    │   ├── info.json       # feature schema, fps, paths
-    │   ├── stats.json      # normalization statistics
-    │   └── tasks.jsonl     # task text & task_id mapping
-    ├── data/
-    │   └── episode_*.parquet   # state, action, timestamps
-    └── videos/
-        └── episode_*.mp4       # camera video streams
+IMPORTANT: This script uses LeRobot's dataset creation API.
+The exact API signatures may vary between versions. Run the verification
+step below after installation to confirm:
 
-CALVIN episode format:
-    Each episode directory contains:
-        - rgb_static.npy          (T, H, W, 3) uint8
-        - rgb_gripper.npy         (T, H, W, 3) uint8
-        - depth_static.npy        (T, H, W)    float32
-        - depth_gripper.npy       (T, H, W)    float32
-        - robot_obs.npy           (T, state_dim) float32
-        - rel_actions.npy         (T, 7) float32
-        - scene_obs.npy           (T, scene_dim) float32
-        - language.pkl            list of language annotations
+    python -c "
+    from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+    import inspect
+    print(inspect.signature(LeRobotDataset.create))
+    "
+
+Expected API (LeRobot >= 0.5):
+    dataset = LeRobotDataset.create(
+        repo_id="calvin_A_train",
+        fps=30,
+        features={...},
+        root="data/lerobot_calvin/calvin_A_train",
+    )
+    dataset.add_frame({...})
+    dataset.save_episode()
+
+If the API differs, this script will print the actual signatures and exit
+with instructions for manual adjustment.
+
+Usage:
+    python scripts/convert_calvin_to_lerobot.py \
+        --calvin_root third_party/calvin/dataset \
+        --output_root data/lerobot_calvin \
+        --splits A ABC D \
+        --val_ratio 0.1 \
+        --seed 42
+
+    # Dry run (verify API without converting):
+    python scripts/convert_calvin_to_lerobot.py --check_api
 """
 
-import json
-import shutil
+import argparse
+import inspect
+import sys
 from pathlib import Path
-from typing import Optional
 
 import cv2
 import numpy as np
-import pyarrow as pa
-import pyarrow.parquet as pq
 from tqdm import tqdm
 
+# Add src to path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-# CALVIN relative cartesian action: [dx, dy, dz, drx, dry, drz, gripper]
+from calvin_lerobot.split import EpisodeInfo, EpisodeSplitter
+
+
+# ─────────────────────────────────────────────────────────
+# LeRobot API Discovery
+# ─────────────────────────────────────────────────────────
+
+def discover_lerobot_api():
+    """
+    Discover the actual LeRobot dataset creation API.
+    Returns a dict of available methods and their signatures.
+    """
+    api_info = {"available": False, "methods": {}, "errors": []}
+
+    try:
+        from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+        api_info["available"] = True
+        api_info["class"] = LeRobotDataset
+
+        # Check for creation methods
+        for method_name in ["create", "from_dict", "__init__"]:
+            method = getattr(LeRobotDataset, method_name, None)
+            if method is not None:
+                try:
+                    sig = inspect.signature(method)
+                    api_info["methods"][method_name] = str(sig)
+                except (ValueError, TypeError):
+                    api_info["methods"][method_name] = "signature unknown"
+
+        # Check for frame/episode methods
+        for method_name in ["add_frame", "save_episode", "save_video",
+                           "push_to_hub", "from_preloaded"]:
+            method = getattr(LeRobotDataset, method_name, None)
+            if method is not None:
+                try:
+                    sig = inspect.signature(method)
+                    api_info["methods"][method_name] = str(sig)
+                except (ValueError, TypeError):
+                    api_info["methods"][method_name] = "signature unknown"
+
+    except ImportError as e:
+        api_info["errors"].append(f"Cannot import LeRobotDataset: {e}")
+    except Exception as e:
+        api_info["errors"].append(f"Error discovering API: {e}")
+
+    return api_info
+
+
+def print_api_report(api_info: dict):
+    """Print a report of discovered API methods."""
+    print("=" * 60)
+    print("LeRobot Dataset API Discovery Report")
+    print("=" * 60)
+
+    if not api_info["available"]:
+        print("\nLeRobot is NOT available.")
+        for err in api_info["errors"]:
+            print(f"  Error: {err}")
+        print("\nInstall lerobot:")
+        print('  pip install "lerobot[aloha]"')
+        return False
+
+    print(f"\nLeRobotDataset class found.")
+    print(f"\nAvailable methods:")
+    for name, sig in sorted(api_info["methods"].items()):
+        print(f"  {name}{sig}")
+
+    # Check critical methods
+    required = ["create", "add_frame", "save_episode"]
+    missing = [m for m in required if m not in api_info["methods"]]
+    if missing:
+        print(f"\nWARNING: Missing expected methods: {missing}")
+        print("The LeRobot API may have changed. Check the documentation:")
+        print("  https://huggingface.co/docs/lerobot")
+        return False
+
+    print("\nAll required methods found. Ready to convert.")
+    return True
+
+
+# ─────────────────────────────────────────────────────────
+# CALVIN Data Reading
+# ─────────────────────────────────────────────────────────
+
+# CALVIN action: [dx, dy, dz, drx, dry, drz, gripper]
 ACTION_DIM = 7
 
-# CALVIN proprioceptive state:
-#   ee_pos(3) + ee_orn_euler(3) + gripper_width(1) + joint_positions(7) + gripper_action(1) = 15
+# CALVIN state: ee_pos(3) + ee_orn(3) + gripper_width(1) + joints(7) + gripper_act(1)
 STATE_DIM = 15
 
 
-class CalvinToLeRobotConverter:
-    """Convert CALVIN episodes into LeRobotDataset v3 format."""
+def read_calvin_episode(ep_info: EpisodeInfo) -> dict:
+    """
+    Read a single CALVIN episode into memory.
 
-    def __init__(
-        self,
-        cameras: list[str] = None,
-        action_space: str = "relative_cartesian",
-        static_size: tuple[int, int] = (200, 200),
-        gripper_size: tuple[int, int] = (84, 84),
-        fps: int = 30,
-    ):
-        self.cameras = cameras or ["static", "gripper"]
-        self.action_space = action_space
-        self.static_size = static_size
-        self.gripper_size = gripper_size
-        self.fps = fps
-
-    def convert(self, episodes: list[Path], output_dir: Path, environments: list[str]):
-        """Convert a list of CALVIN episode paths to LeRobotDataset."""
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        meta_dir = output_dir / "meta"
-        data_dir = output_dir / "data"
-        videos_dir = output_dir / "videos"
-        for d in [meta_dir, data_dir, videos_dir]:
-            d.mkdir(exist_ok=True)
-
-        # Build feature schema
-        info = self._build_info(environments)
-        with open(meta_dir / "info.json", "w") as f:
-            json.dump(info, f, indent=2)
-
-        # Collect all tasks across episodes
-        all_tasks = {}
-        task_id_counter = 0
-
-        # Global stats accumulators
-        action_sum = np.zeros(ACTION_DIM, dtype=np.float64)
-        action_sq_sum = np.zeros(ACTION_DIM, dtype=np.float64)
-        action_min = np.full(ACTION_DIM, np.inf)
-        action_max = np.full(ACTION_DIM, -np.inf)
-        state_sum = np.zeros(STATE_DIM, dtype=np.float64)
-        state_sq_sum = np.zeros(STATE_DIM, dtype=np.float64)
-        state_min = np.full(STATE_DIM, np.inf)
-        state_max = np.full(STATE_DIM, -np.inf)
-        total_frames = 0
-
-        for ep_idx, ep_path in enumerate(tqdm(episodes, desc="Converting episodes")):
-            # Load CALVIN data
-            rgb_static = np.load(ep_path / "rgb_static.npy")
-            rgb_gripper = np.load(ep_path / "rgb_gripper.npy")
-            robot_obs = np.load(ep_path / "robot_obs.npy")
-            rel_actions = np.load(ep_path / "rel_actions.npy")
-
-            T = len(rgb_static)
-
-            # Resize images if needed
-            if "static" in self.cameras:
-                rgb_static = self._resize_batch(rgb_static, self.static_size)
-            if "gripper" in self.cameras:
-                rgb_gripper = self._resize_batch(rgb_gripper, self.gripper_size)
-
-            # Load language annotations
-            tasks = self._load_language(ep_path)
-            for task_text in tasks:
-                if task_text not in all_tasks:
-                    all_tasks[task_text] = task_id_counter
-                    task_id_counter += 1
-
-            # Assign task_index (use first annotation)
-            task_index = all_tasks.get(tasks[0], 0) if tasks else 0
-
-            # Extract environment name from path
-            env_name = self._extract_env_name(ep_path)
-
-            # Write video files
-            if "static" in self.cameras:
-                self._write_video(rgb_static, videos_dir / f"episode_{ep_idx:06d}_static.mp4")
-            if "gripper" in self.cameras:
-                self._write_video(rgb_gripper, videos_dir / f"episode_{ep_idx:06d}_gripper.mp4")
-
-            # Build parquet table
-            timestamps = np.arange(T, dtype=np.float32) / self.fps
-            frame_indices = np.arange(T, dtype=np.int64)
-            episode_indices = np.full(T, ep_idx, dtype=np.int64)
-            task_indices = np.full(T, task_index, dtype=np.int64)
-            next_done = np.zeros(T, dtype=np.bool_)
-            next_done[-1] = True
-
-            table = pa.table({
-                "timestamp": timestamps,
-                "frame_index": frame_indices,
-                "episode_index": episode_indices,
-                "task_index": task_indices,
-                "next.done": next_done,
-                "observation.state": [row.tolist() for row in robot_obs.astype(np.float32)],
-                "action": [row.tolist() for row in rel_actions.astype(np.float32)],
-            })
-
-            pq.write_table(table, data_dir / f"episode_{ep_idx:06d}.parquet")
-
-            # Accumulate stats
-            actions = rel_actions.astype(np.float64)
-            states = robot_obs.astype(np.float64)
-            action_sum += actions.sum(axis=0)
-            action_sq_sum += (actions ** 2).sum(axis=0)
-            action_min = np.minimum(action_min, actions.min(axis=0))
-            action_max = np.maximum(action_max, actions.max(axis=0))
-            state_sum += states.sum(axis=0)
-            state_sq_sum += (states ** 2).sum(axis=0)
-            state_min = np.minimum(state_min, states.min(axis=0))
-            state_max = np.maximum(state_max, states.max(axis=0))
-            total_frames += T
-
-        # Write tasks.jsonl
-        with open(meta_dir / "tasks.jsonl", "w") as f:
-            for task_text, tid in sorted(all_tasks.items(), key=lambda x: x[1]):
-                f.write(json.dumps({"task_index": tid, "task": task_text}) + "\n")
-
-        # Write stats.json
-        n = max(total_frames, 1)
-        action_mean = action_sum / n
-        action_std = np.sqrt(action_sq_sum / n - action_mean ** 2)
-        state_mean = state_sum / n
-        state_std = np.sqrt(state_sq_sum / n - state_mean ** 2)
-
-        stats = {
-            "observation.state": {
-                "mean": state_mean.tolist(),
-                "std": state_std.tolist(),
-                "min": state_min.tolist(),
-                "max": state_max.tolist(),
-            },
-            "action": {
-                "mean": action_mean.tolist(),
-                "std": action_std.tolist(),
-                "min": action_min.tolist(),
-                "max": action_max.tolist(),
-            },
+    Returns:
+        {
+            "rgb_static": np.ndarray (T, H, W, 3) uint8,
+            "rgb_gripper": np.ndarray (T, H, W, 3) uint8,
+            "robot_obs": np.ndarray (T, STATE_DIM) float32,
+            "rel_actions": np.ndarray (T, ACTION_DIM) float32,
+            "language": list[str],
         }
-        with open(meta_dir / "stats.json", "w") as f:
-            json.dump(stats, f, indent=2)
+    """
+    ep_dir = ep_info.path
 
-        print(f"  Converted {len(episodes)} episodes, {total_frames} frames")
+    # Required files
+    rgb_static = np.load(ep_dir / "rgb_static.npy")
+    rgb_gripper = np.load(ep_dir / "rgb_gripper.npy")
+    robot_obs = np.load(ep_dir / "robot_obs.npy")
+    rel_actions = np.load(ep_dir / "rel_actions.npy")
 
-    def _build_info(self, environments: list[str]) -> dict:
-        """Build LeRobotDataset info.json."""
-        features = {
-            "timestamp": {"dtype": "float32", "shape": (1,)},
-            "frame_index": {"dtype": "int64", "shape": (1,)},
-            "episode_index": {"dtype": "int64", "shape": (1,)},
-            "task_index": {"dtype": "int64", "shape": (1,)},
-            "next.done": {"dtype": "bool", "shape": (1,)},
-            "observation.state": {"dtype": "float32", "shape": (STATE_DIM,)},
-            "action": {"dtype": "float32", "shape": (ACTION_DIM,)},
-        }
-
-        if "static" in self.cameras:
-            h, w = self.static_size
-            features["observation.images.static"] = {
-                "dtype": "video",
-                "shape": (3, h, w),
-                "names": ["channels", "height", "width"],
-                "video.fps": self.fps,
-                "video.codec": "av1",
-                "video.pix_fmt": "yuv420p",
-            }
-        if "gripper" in self.cameras:
-            h, w = self.gripper_size
-            features["observation.images.gripper"] = {
-                "dtype": "video",
-                "shape": (3, h, w),
-                "names": ["channels", "height", "width"],
-                "video.fps": self.fps,
-                "video.codec": "av1",
-                "video.pix_fmt": "yuv420p",
-            }
-
-        return {
-            "codebase_version": "v3",
-            "robot_type": "calvin",
-            "fps": self.fps,
-            "chunks_size": 1,
-            "total_episodes": 0,  # filled after conversion
-            "total_frames": 0,
-            "total_tasks": 0,
-            "total_chunks": 0,
-            "features": features,
-            "environments": environments,
-            "action_space": self.action_space,
-        }
-
-    def _resize_batch(self, images: np.ndarray, target_size: tuple[int, int]) -> np.ndarray:
-        """Resize a batch of images (T, H, W, 3) -> (T, H', W', 3)."""
-        h, w = target_size
-        if images.shape[1] == h and images.shape[2] == w:
-            return images
-        resized = np.zeros((len(images), h, w, 3), dtype=np.uint8)
-        for i, img in enumerate(images):
-            resized[i] = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA)
-        return resized
-
-    def _write_video(self, frames: np.ndarray, path: Path):
-        """Write RGB frames as MP4 video."""
-        h, w = frames.shape[1], frames.shape[2]
-        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        writer = cv2.VideoWriter(str(path), fourcc, self.fps, (w, h))
-        for frame in frames:
-            writer.write(cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
-        writer.release()
-
-    def _load_language(self, ep_path: Path) -> list[str]:
-        """Load language annotations from CALVIN episode."""
-        lang_file = ep_path / "language.pkl"
-        if lang_file.exists():
+    # Optional: language annotations
+    language = []
+    for lang_file in ["language.pkl", "lang_annotations.pkl"]:
+        lang_path = ep_dir / lang_file
+        if lang_path.exists():
             import pickle
-            with open(lang_file, "rb") as f:
-                data = pickle.load(f)
-            if isinstance(data, list):
-                return [str(x) for x in data]
-            return [str(data)]
-        return ["unlabeled_task"]
+            with open(lang_path, "rb") as f:
+                lang_data = pickle.load(f)
+            if isinstance(lang_data, dict):
+                # CALVIN format: {ind: {lang: [annotations]}}
+                for ind_data in lang_data.values():
+                    if isinstance(ind_data, dict) and "lang" in ind_data:
+                        language.extend(ind_data["lang"])
+            elif isinstance(lang_data, (list, tuple)):
+                language.extend([str(x) for x in lang_data])
+            break
 
-    def _extract_env_name(self, ep_path: Path) -> str:
-        """Extract environment name (A/B/C/D) from episode path."""
-        # CALVIN data layout: .../task_D_D/episode_XXXXX or .../env_A/...
-        parts = ep_path.parts
-        for part in parts:
-            for env in ["A", "B", "C", "D"]:
-                if f"_{env}_" in part or part.endswith(f"_{env}") or f"env_{env}" in part:
-                    return env
-        return "unknown"
+    if not language:
+        language = ["unlabeled_task"]
+
+    return {
+        "rgb_static": rgb_static.astype(np.uint8),
+        "rgb_gripper": rgb_gripper.astype(np.uint8),
+        "robot_obs": robot_obs.astype(np.float32),
+        "rel_actions": rel_actions.astype(np.float32),
+        "language": language,
+    }
+
+
+def resize_images(images: np.ndarray, target_hw: tuple[int, int]) -> np.ndarray:
+    """Resize (T, H, W, 3) images to target size."""
+    h, w = target_hw
+    if images.shape[1] == h and images.shape[2] == w:
+        return images
+    resized = np.zeros((len(images), h, w, 3), dtype=images.dtype)
+    for i in range(len(images)):
+        resized[i] = cv2.resize(images[i], (w, h), interpolation=cv2.INTER_AREA)
+    return resized
+
+
+# ─────────────────────────────────────────────────────────
+# LeRobot Conversion
+# ─────────────────────────────────────────────────────────
+
+def define_features(
+    static_hw: tuple[int, int] = (200, 200),
+    gripper_hw: tuple[int, int] = (84, 84),
+    state_dim: int = STATE_DIM,
+    action_dim: int = ACTION_DIM,
+    fps: int = 30,
+) -> dict:
+    """
+    Define LeRobot feature schema.
+
+    IMPORTANT: Verify these match your LeRobot version's expected format.
+    Check with:
+        from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+        ds = LeRobotDataset("some_existing_dataset")
+        print(ds.features)
+    """
+    return {
+        "observation.images.static": {
+            "dtype": "image",
+            "shape": (3, *static_hw),
+            "names": ["channels", "height", "width"],
+        },
+        "observation.images.gripper": {
+            "dtype": "image",
+            "shape": (3, *gripper_hw),
+            "names": ["channels", "height", "width"],
+        },
+        "observation.state": {
+            "dtype": "float32",
+            "shape": (state_dim,),
+        },
+        "action": {
+            "dtype": "float32",
+            "shape": (action_dim,),
+        },
+    }
+
+
+def convert_episodes(
+    episodes: list[EpisodeInfo],
+    repo_id: str,
+    output_root: Path,
+    static_hw: tuple[int, int] = (200, 200),
+    gripper_hw: tuple[int, int] = (84, 84),
+    fps: int = 30,
+):
+    """
+    Convert CALVIN episodes to LeRobotDataset using official API.
+
+    Args:
+        episodes: list of EpisodeInfo from splitter
+        repo_id: dataset identifier (e.g., "calvin_A_train")
+        output_root: base output directory
+        static_hw: static camera image size (H, W)
+        gripper_hw: gripper camera image size (H, W)
+        fps: frames per second
+    """
+    from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+
+    features = define_features(static_hw, gripper_hw, fps=fps)
+    output_dir = output_root / repo_id
+
+    # Create dataset using official API
+    # NOTE: If this fails, check API signature with:
+    #   python scripts/convert_calvin_to_lerobot.py --check_api
+    dataset = LeRobotDataset.create(
+        repo_id=repo_id,
+        fps=fps,
+        features=features,
+        root=str(output_dir),
+    )
+
+    print(f"Created dataset: {repo_id}")
+    print(f"  Output: {output_dir}")
+    print(f"  Episodes to convert: {len(episodes)}")
+
+    for ep_idx, ep_info in enumerate(tqdm(episodes, desc="Converting")):
+        data = read_calvin_episode(ep_info)
+
+        # Resize images
+        static_imgs = resize_images(data["rgb_static"], static_hw)  # (T, H, W, 3)
+        gripper_imgs = resize_images(data["rgb_gripper"], gripper_hw)  # (T, H, W, 3)
+
+        T = len(static_imgs)
+        task_text = data["language"][0] if data["language"] else "unlabeled_task"
+
+        # Add frames one by one
+        for t in range(T):
+            # Convert (H, W, 3) -> (3, H, W) and normalize to [0, 1]
+            static_img = static_imgs[t].transpose(2, 0, 1).astype(np.float32) / 255.0
+            gripper_img = gripper_imgs[t].transpose(2, 0, 1).astype(np.float32) / 255.0
+
+            frame = {
+                "observation.images.static": static_img,
+                "observation.images.gripper": gripper_img,
+                "observation.state": data["robot_obs"][t],
+                "action": data["rel_actions"][t],
+                "task": task_text,
+            }
+            dataset.add_frame(frame)
+
+        dataset.save_episode()
+
+        if (ep_idx + 1) % 10 == 0 or ep_idx == len(episodes) - 1:
+            print(f"  Converted {ep_idx + 1}/{len(episodes)} episodes")
+
+    print(f"\nDataset complete: {len(dataset)} frames from {len(episodes)} episodes")
+    return dataset
+
+
+def verify_dataset(repo_id: str, output_root: Path):
+    """
+    Verify the converted dataset can be loaded by LeRobot.
+
+    This is a critical check — if this fails, the training pipeline
+    will also fail.
+    """
+    from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+
+    output_dir = output_root / repo_id
+
+    try:
+        ds = LeRobotDataset(repo_id, root=str(output_dir))
+        print(f"\n=== Verification: {repo_id} ===")
+        print(f"  Loaded successfully!")
+        print(f"  Total frames: {len(ds)}")
+
+        if len(ds) > 0:
+            sample = ds[0]
+            print(f"  Sample keys: {list(sample.keys())}")
+            for key, value in sample.items():
+                if hasattr(value, "shape"):
+                    print(f"    {key}: shape={value.shape}, dtype={value.dtype}")
+                else:
+                    print(f"    {key}: {type(value).__name__} = {str(value)[:50]}")
+        return True
+
+    except Exception as e:
+        print(f"\n=== Verification FAILED: {repo_id} ===")
+        print(f"  Error: {e}")
+        print(f"\n  Possible causes:")
+        print(f"    1. LeRobot API version mismatch")
+        print(f"    2. Incorrect feature schema")
+        print(f"    3. Missing required metadata files")
+        print(f"\n  Debug steps:")
+        print(f"    python scripts/convert_calvin_to_lerobot.py --check_api")
+        print(f"    ls -la {output_dir}/meta/")
+        print(f"    cat {output_dir}/meta/info.json")
+        return False
+
+
+# ─────────────────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────────────────
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Convert CALVIN to LeRobotDataset")
+    parser.add_argument("--calvin_root", type=str,
+                        help="Path to CALVIN dataset root")
+    parser.add_argument("--output_root", type=str, default="data/lerobot_calvin",
+                        help="Output directory for LeRobot datasets")
+    parser.add_argument("--splits", nargs="+", default=["A", "ABC", "D"],
+                        help="Dataset splits to create")
+    parser.add_argument("--val_ratio", type=float, default=0.1)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--max_episodes_per_env", type=int, default=None,
+                        help="Limit episodes per env (for debug)")
+    parser.add_argument("--static_size", type=int, nargs=2, default=[200, 200])
+    parser.add_argument("--gripper_size", type=int, nargs=2, default=[84, 84])
+    parser.add_argument("--fps", type=int, default=30)
+    parser.add_argument("--check_api", action="store_true",
+                        help="Only check LeRobot API, don't convert")
+    parser.add_argument("--skip_verify", action="store_true",
+                        help="Skip dataset verification after conversion")
+    return parser.parse_args()
+
+
+def main():
+    args = parse_args()
+
+    # API check mode
+    if args.check_api:
+        api_info = discover_lerobot_api()
+        print_api_report(api_info)
+        return
+
+    if not args.calvin_root:
+        print("Error: --calvin_root is required for conversion")
+        print("Use --check_api to verify LeRobot installation first")
+        sys.exit(1)
+
+    # Verify LeRobot is available
+    api_info = discover_lerobot_api()
+    if not print_api_report(api_info):
+        print("\nCannot proceed without LeRobot. Install and retry.")
+        sys.exit(1)
+
+    output_root = Path(args.output_root)
+    output_root.mkdir(parents=True, exist_ok=True)
+
+    # Split episodes
+    splitter = EpisodeSplitter(seed=args.seed, val_ratio=args.val_ratio)
+    static_hw = tuple(args.static_size)
+    gripper_hw = tuple(args.gripper_size)
+
+    for split_name in args.splits:
+        envs = list(split_name)
+        is_test_only = (split_name == "D")
+
+        print(f"\n{'='*60}")
+        print(f"Processing split: {split_name} (envs={envs})")
+        print(f"{'='*60}")
+
+        # Determine train/val/test environments
+        if is_test_only:
+            splits = splitter.split(
+                calvin_root=Path(args.calvin_root),
+                train_envs=[],       # no training
+                test_env="D",
+                max_episodes_per_env=args.max_episodes_per_env,
+            )
+            # For D-only split, use test episodes as the dataset
+            episodes = splits["test"]
+            repo_id = f"calvin_D_test"
+        else:
+            splits = splitter.split(
+                calvin_root=Path(args.calvin_root),
+                train_envs=envs,
+                test_env="D",
+                max_episodes_per_env=args.max_episodes_per_env,
+            )
+            episodes = splits["train"]
+            repo_id = f"calvin_{split_name}_train"
+
+        if not episodes:
+            print(f"  No episodes found for {split_name}, skipping")
+            continue
+
+        # Convert train episodes
+        print(f"\nConverting {len(episodes)} episodes -> {repo_id}")
+        convert_episodes(
+            episodes=episodes,
+            repo_id=repo_id,
+            output_root=output_root,
+            static_hw=static_hw,
+            gripper_hw=gripper_hw,
+            fps=args.fps,
+        )
+
+        # Verify
+        if not args.skip_verify:
+            verify_dataset(repo_id, output_root)
+
+        # Convert val episodes (skip for D)
+        if not is_test_only and splits["val"]:
+            val_repo_id = f"calvin_{split_name}_val"
+            print(f"\nConverting {len(splits['val'])} val episodes -> {val_repo_id}")
+            convert_episodes(
+                episodes=splits["val"],
+                repo_id=val_repo_id,
+                output_root=output_root,
+                static_hw=static_hw,
+                gripper_hw=gripper_hw,
+                fps=args.fps,
+            )
+            if not args.skip_verify:
+                verify_dataset(val_repo_id, output_root)
+
+    print(f"\n{'='*60}")
+    print(f"All conversions complete!")
+    print(f"Output directory: {args.output_root}")
+    print(f"{'='*60}")
+
+
+if __name__ == "__main__":
+    main()
