@@ -1,0 +1,40 @@
+# ============================================
+# 题目一 - 3D 资产准备 依赖列表
+# ============================================
+
+# --- 通用依赖 ---
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.24.0
+Pillow>=9.5.0
+opencv-python>=4.7.0
+matplotlib>=3.7.0
+tqdm>=4.65.0
+imageio>=2.28.0
+imageio-ffmpeg>=0.4.8
+trimesh>=3.21.0
+plyfile>=0.9
+scipy>=1.10.0
+omegaconf>=2.3.0
+
+# --- Object A: 3DGS 相关 ---
+# 3dgs 依赖通过子模块安装 (见 README)
+# diff-gaussian-rasterization
+# simple-knn
+
+# --- Object B: threestudio 相关 ---
+lightning>=2.0.0
+diffusers>=0.21.0
+transformers>=4.30.0
+accelerate>=0.20.0
+xformers>=0.0.20
+triton>=2.0.0
+jaxtyping>=0.2.0
+typeguard>=4.0.0
+
+# --- Object C: Zero123 相关 ---
+# zero123 依赖通过子模块安装 (见 README)
+# kornia
+einops>=0.6.0
+rembg>=2.0.0
+onnxruntime>=1.15.0

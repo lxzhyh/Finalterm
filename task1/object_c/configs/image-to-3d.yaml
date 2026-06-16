@@ -1,0 +1,113 @@
+# threestudio 配置文件 - 单图到 3D 生成 (Zero123)
+# 使用 Zero123 扩散模型 + SDS Loss
+
+name: "image-to-3d-zero123"
+tag: "${basename:${data.image_path}}"
+exp_root_dir: "output"
+seed: 0
+
+data_type: "single-image-datamodule"
+data:
+  image_path: "data/processed/object_nobg.png"
+  height: 256
+  width: 256
+  default_elevation_deg: 0.0
+  default_azimuth_deg: 0.0
+  default_camera_distance: 1.5
+  default_fovy_deg: 40.0
+  random_camera:
+    batch_size: 1
+    height: 64
+    width: 64
+    elevation_range: [-10, 45]
+    azimuth_range: [-180, 180]
+    camera_distance_range: [1.0, 1.5]
+    fovy_range: [30, 50]
+    batch_uniform_azimuth: true
+
+system_type: "zero123-system"
+system:
+  geometry_type: "implicit-volume"
+  geometry:
+    radius: 1.0
+    normal_type: analytic
+    density_bias: "blob_magic3d"
+    density_activation: softplus
+    density_blob_scale: 10.0
+    density_blob_std: 0.5
+    pos_encoding_config:
+      otype: HashGrid
+      n_levels: 16
+      n_features_per_level: 2
+      log2_hashmap_size: 19
+      base_resolution: 16
+      per_level_scale: 1.447269237440378
+
+  material_type: "no-material"
+  material:
+    n_output_dims: 3
+    color_activation: sigmoid
+
+  background_type: "solid-color-background"
+  background:
+    color: [1.0, 1.0, 1.0]
+
+  renderer_type: "nerf-volume-renderer"
+  renderer:
+    radius: ${system.geometry.radius}
+    num_samples_per_ray: 512
+
+  guidance_type: "zero123-guidance"
+  guidance:
+    pretrained_model_name_or_path: "./load/zero123/zero123-xl.ckpt"
+    pretrained_config: "./load/zero123/sd-objaverse-finetune-c_concat-256.yaml"
+    guidance_scale: 5.0
+    min_step_percent: 0.02
+    max_step_percent: 0.98
+    cond_image_path: ${data.image_path}
+    cond_elevation_deg: ${data.default_elevation_deg}
+    cond_azimuth_deg: ${data.default_azimuth_deg}
+    cond_camera_distance: ${data.default_camera_distance}
+
+  freq:
+    ref_only_steps: 0
+    guidance_eval: 0
+
+  loggers:
+    wandb:
+      enable: false
+      project: "threestudio"
+      name: "zero123"
+
+  loss:
+    lambda_sds: 0.1
+    lambda_rgb: 500.
+    lambda_mask: 50.
+    lambda_depth: 0.
+    lambda_depth_rel: 0.
+    lambda_normal: 0.
+    lambda_normal_smooth: 0.
+    lambda_3d_normal_smooth: 0.
+    lambda_orient: 0.
+    lambda_sparsity: 0.1
+    lambda_opaque: 0.1
+
+  optimizer:
+    name: Adam
+    args:
+      lr: 0.01
+      betas: [0.9, 0.99]
+      eps: 1.e-15
+
+trainer:
+  max_steps: 5000
+  log_every_n_steps: 1
+  num_sanity_val_steps: 0
+  val_check_interval: 200
+  enable_progress_bar: true
+  precision: 16-mixed
+
+checkpoint:
+  save_last: true
+  save_top_k: -1
+  every_n_train_steps: ${trainer.max_steps}
