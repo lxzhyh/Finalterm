@@ -1,10 +1,4 @@
-"""
-使用 Zero123 从单张图像生成 3D 模型。
-结合 threestudio 框架实现。
-
-用法:
-    python train_image_to_3d.py --config configs/image-to-3d.yaml --image data/processed/photo_nobg.png
-"""
+"""单图到 3D，用 Zero123 + threestudio。"""
 
 import argparse
 import os
@@ -15,7 +9,6 @@ from pathlib import Path
 
 
 def find_threestudio_repo():
-    """查找 threestudio 代码仓库位置"""
     candidates = [
         os.environ.get("THREESTUDIO_REPO_PATH", ""),
         os.path.join(os.path.dirname(__file__), "..", "third_party", "threestudio"),
@@ -29,15 +22,12 @@ def find_threestudio_repo():
 
 def train_image_to_3d(config_path: str, image_path: str = None, output_dir: str = "output",
                       max_steps: int = 5000, gpu_id: int = 0):
-    """
-    调用 threestudio + Zero123 进行单图到 3D 生成。
-    """
     os.makedirs(output_dir, exist_ok=True)
 
     threestudio_repo = find_threestudio_repo()
 
     if threestudio_repo is not None:
-        print(f"找到 threestudio 仓库: {threestudio_repo}")
+        print(f"threestudio: {threestudio_repo}")
 
         cmd = [
             sys.executable, "launch.py",
@@ -51,40 +41,30 @@ def train_image_to_3d(config_path: str, image_path: str = None, output_dir: str 
         if image_path:
             cmd.append(f"data.image_path={os.path.abspath(image_path)}")
 
-        print(f"\n开始单图到 3D 生成...")
-        print(f"命令: {' '.join(cmd)}")
-
+        print(f"开始 image-to-3d...")
         start_time = time.time()
         result = subprocess.run(cmd, cwd=threestudio_repo)
         elapsed = time.time() - start_time
 
         if result.returncode != 0:
-            raise RuntimeError("threestudio 训练失败")
+            raise RuntimeError("threestudio 训练挂了")
 
-        print(f"\n生成完成! 耗时: {elapsed/60:.1f} 分钟")
+        print(f"完成，{elapsed/60:.1f} 分钟")
     else:
-        print("[警告] 未找到 threestudio 仓库，使用内置简化脚本")
-        print("请按照 README 中的说明安装 threestudio 后重新运行")
+        print("没找到 threestudio 仓库，用内置简化版本跑")
         train_image_to_3d_standalone(config_path, image_path, output_dir, max_steps)
 
 
 def train_image_to_3d_standalone(config_path: str, image_path: str = None,
                                   output_dir: str = "output", max_steps: int = 5000):
-    """
-    独立的单图到 3D 生成入口。
-    """
     try:
         import torch
         import threestudio
         from omegaconf import OmegaConf
         import pytorch_lightning as pl
     except ImportError:
-        print("\n[错误] 无法导入 threestudio 模块。")
-        print("请先安装 threestudio:")
-        print("  git clone https://github.com/threestudio-project/threestudio")
-        print("  cd threestudio")
-        print("  pip install -r requirements.txt")
-        print("  pip install -e .")
+        print("缺 threestudio 模块，装一下:")
+        print("  git clone https://github.com/threestudio-project/threestudio && cd threestudio && pip install -r requirements.txt && pip install -e .")
         sys.exit(1)
 
     # 加载配置
@@ -99,13 +79,7 @@ def train_image_to_3d_standalone(config_path: str, image_path: str = None,
     cfg.exp_root_dir = output_dir
     cfg.trainer.max_steps = max_steps
 
-    print(f"\n{'='*60}")
-    print(f"单图到 3D 生成参数:")
-    print(f"  配置文件: {config_path}")
-    print(f"  输入图像: {cfg.data.image_path}")
-    print(f"  输出目录: {output_dir}")
-    print(f"  最大步数: {max_steps}")
-    print(f"{'='*60}\n")
+    print(f"config: {config_path} | image: {cfg.data.image_path} | output: {output_dir} | max_steps: {max_steps}")
 
     # 设置随机种子
     pl.seed_everything(cfg.seed, workers=True)
@@ -135,36 +109,22 @@ def train_image_to_3d_standalone(config_path: str, image_path: str = None,
     trainer.fit(system, datamodule=dm)
 
     elapsed = time.time() - start_time
-    print(f"\n生成完成! 总耗时: {elapsed/60:.1f} 分钟")
-    print(f"模型已保存至: {output_dir}")
+    print(f"完成，{elapsed/60:.1f} 分钟，模型在 {output_dir}")
 
 
 def export_mesh(model_path: str, output_path: str, resolution: int = 256):
-    """
-    将隐式场导出为 Mesh。
-    """
-    print(f"\n导出 Mesh...")
-    print(f"  模型路径: {model_path}")
-    print(f"  分辨率: {resolution}")
-    print(f"  输出路径: {output_path}")
-
-    print("[提示] 请使用 threestudio 官方导出脚本:")
-    print(f"  python launch.py --config {model_path}/config.yaml --export --gpu 0")
+    print(f"\n导出 mesh: {model_path} -> {output_path} (res {resolution})")
+    print(f"用 threestudio 导出: python launch.py --config {model_path}/config.yaml --export --gpu 0")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="单图到 3D 生成 (Zero123)")
-    parser.add_argument("--config", type=str, default="configs/image-to-3d.yaml",
-                        help="配置文件路径")
-    parser.add_argument("--image", type=str, default=None,
-                        help="输入图像路径 (覆盖配置文件中的 image_path)")
-    parser.add_argument("--output_dir", type=str, default="output",
-                        help="输出目录")
-    parser.add_argument("--max_steps", type=int, default=5000,
-                        help="最大训练步数")
-    parser.add_argument("--gpu_id", type=int, default=0, help="GPU 设备 ID")
-    parser.add_argument("--export_mesh", action="store_true",
-                        help="训练后导出 Mesh")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="configs/image-to-3d.yaml")
+    parser.add_argument("--image", type=str, default=None)
+    parser.add_argument("--output_dir", type=str, default="output")
+    parser.add_argument("--max_steps", type=int, default=5000)
+    parser.add_argument("--gpu_id", type=int, default=0)
+    parser.add_argument("--export_mesh", action="store_true")
     args = parser.parse_args()
 
     os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_id)
