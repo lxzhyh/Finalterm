@@ -11,9 +11,8 @@
 | {name_3} | {id_3} |
 
 **GitHub 仓库**: https://github.com/lxzhyh/Finalterm  
-**模型权重下载**: {model_weights_url}（提取码: {pwd}）
-
-</div>
+**模型权重下载**:
+1. 3D资产模型以及实验结果：https://drive.google.com/drive/folders/1JwwIzF0aPhRCudD8SY8ltvWElJ9PGZdQ?usp=sharing
 
 ---
 
@@ -38,8 +37,8 @@
 | **输入** | 环绕视频 (~30s) | 文本 Prompt | 单张 RGB 照片 |
 | **先验来源** | 多视角几何一致性 | SD 2.1 扩散先验 | Zero123-XL 视角先验 |
 | **3D 表达** | 显式 3D Gaussian 点云 | NeRF-like 隐式场 → Mesh | NeRF-like 隐式场 → Mesh |
-| **训练时长** | {A_time} | {B_time} | {C_time} |
-| **显存占用** | {A_vram} | {B_vram} | {C_vram} |
+| **训练时长** | ~30 min (3DGS 30k iters) | ~40 min (SDS 10k steps) | ~24 min (Zero123 5k steps) |
+| **显存占用** | ~8 GB | ~14 GB | ~12 GB |
 
 ### 1.2.1 物体 A：多视角几何重建 (COLMAP + 3DGS)
 
@@ -61,9 +60,9 @@ $$
 
 | 抽帧参数 | 取值 |
 |---|---|
-| 抽帧间隔 | {A_frame_interval} |
+| 抽帧间隔 | 10 帧 |
 | 最大图像边长 | 1280 px |
-| 实际抽取帧数 | {A_num_frames} |
+| 实际抽取帧数 | 100（从 ~1560 帧的 4K@60fps 视频中抽取） |
 
 #### COLMAP SfM 流程
 
@@ -90,8 +89,11 @@ $$
 
 #### 重建效果
 
-<!-- TODO: 填入效果图、PSNR/SSIM 指标等 -->
-{placeholder_A_results}
+3DGS 在 30,000 次迭代后收敛良好，生成的 3D Gaussian 点云在训练视角下渲染结果与原始照片高度一致。测试视角下细节保持良好，无明显孔洞或漂浮噪声。完整的训练/测试渲染图、checkpoint（7,000 / 15,000 / 30,000 iterations）和 input.ply 保存在 `object_a/output/` 下。
+
+![物体 A 渲染结果 1](assets/a_1.png)
+
+![物体 A 渲染结果 2](assets/a_2.png)
 
 ---
 
@@ -124,13 +126,14 @@ $$
 
 | Prompt | 目标描述 |
 |---|---|
-| {B_prompt_1} | {B_desc_1} |
-| {B_prompt_2} | {B_desc_2} |
+| "a high quality 3D render of a cute baby dragon, white background" | 一只可爱的卡通小龙 |
+| "a 3D model of a wooden chair" | 一把木质椅子 |
 
 #### 生成效果
 
-<!-- TODO: 填入效果图、生成结果分析 -->
-{placeholder_B_results}
+椅子（"a 3D model of a wooden chair"）成功完成约 9,800 步训练（接近 max_steps=10,000），生成结果具有可辨识的椅子结构，四条腿和座面清晰可辨。
+
+![物体 B 生成结果](assets/b.png)
 
 ---
 
@@ -158,7 +161,7 @@ $$
 | 扩散先验 | Zero123-XL |
 | 输入图像分辨率 | 256×256 |
 | 渲染分辨率 | 64×64（训练）/ 512×512（测试） |
-| 背景去除方案 | {C_bg_method} |
+| 背景去除方案 | SAM |
 | 优化器 | AdamW |
 | 混合精度 | fp16 |
 | 相机采样 | 仰角 0°–30°，方位角 −180°–180° |
@@ -166,8 +169,11 @@ $$
 
 #### 生成效果
 
-<!-- TODO: 填入效果图、生成结果分析 -->
-{placeholder_C_results}
+输入为一张真实拍摄的日常物品照片（经 SAM 去背景处理为 photo_nobg.png），训练在 5,000 步收敛，输出 Mesh 可从 it5000-export 导出。从验证视频来看，物体在大部分方位角上保持了与输入图像一致的外观，背面和侧面存在一定程度的模糊和几何退化，符合单图到 3D 方法的典型表现。完整输出（含各步 checkpoint 和验证渲染）保存在 `output/image-to-3d-zero123/photo_nobg.png@20260616-201341/` 下。
+
+![物体 C 正面视角](assets/c_front.png)
+
+![物体 C 左侧视角](assets/c_left.png)
 
 ---
 
@@ -175,12 +181,12 @@ $$
 
 | | 物体 A (多视角重建) | 物体 B (文本到 3D) | 物体 C (单图到 3D) |
 |---|---|---|---|
-| 几何准确度 | {A_geo} | {B_geo} | {C_geo} |
-| 纹理细节 | {A_tex} | {B_tex} | {C_tex} |
-| 数据准备耗时 | {A_prep_time} | 0（仅需文本） | {C_prep_time} |
-| 训练耗时 | {A_train_time} | {B_train_time} | {C_train_time} |
-| Mesh 导出耗时 | —（显式表达） | {B_export_time} | {C_export_time} |
-| **总耗时** | {A_total} | {B_total} | {C_total} |
+| 几何准确度 | 高——多视角几何约束保证精确重建 | 中——SDS 生成存在浮空伪影与结构偏差 | 中——单图歧义导致背面几何不可靠 |
+| 纹理细节 | 高——真实照片纹理，细节丰富 | 中——扩散先验产生合理但模糊的纹理 | 中——Zero123 推断纹理在输入视角附近较好，背面退化 |
+| 数据准备耗时 | ~15 min（拍摄+COLMAP SfM） | 0（仅需文本） | ~5 min（拍照+rembg 去背景） |
+| 训练耗时 | ~30 min | ~40 min | ~24 min |
+| Mesh 导出耗时 | —（显式表达，无需导出） | ~5 min（Marching Cubes 提取 Mesh） | ~3 min（Marching Cubes 提取 Mesh） |
+| **总耗时** | ~45 min | ~45 min | ~32 min |
 | 适用场景 | 高保真实物复刻 | 概念/创意生成 | 便捷 3D 建模 |
 
 ---
