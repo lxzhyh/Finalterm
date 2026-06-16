@@ -1,3 +1,4 @@
+# HW3 题目一用的 conda 环境，懒得手动装的直接 conda env create -f environment.yml
 name: hw3d_assets
 channels:
   - pytorch

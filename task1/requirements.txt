@@ -1,8 +1,3 @@
-# ============================================
-# 题目一 - 3D 资产准备 依赖列表
-# ============================================
-
-# --- 通用依赖 ---
 torch>=2.0.0
 torchvision>=0.15.0
 numpy>=1.24.0
@@ -17,12 +12,12 @@ plyfile>=0.9
 scipy>=1.10.0
 omegaconf>=2.3.0
 
-# --- Object A: 3DGS 相关 ---
-# 3dgs 依赖通过子模块安装 (见 README)
-# diff-gaussian-rasterization
-# simple-knn
+# 3dgs 通过子模块装，这里不列
+einops>=0.6.0
+rembg>=2.0.0
+onnxruntime>=1.15.0
 
-# --- Object B: threestudio 相关 ---
+# threestudio / Zero123 相关
 lightning>=2.0.0
 diffusers>=0.21.0
 transformers>=4.30.0
@@ -31,10 +26,3 @@ xformers>=0.0.20
 triton>=2.0.0
 jaxtyping>=0.2.0
 typeguard>=4.0.0
-
-# --- Object C: Zero123 相关 ---
-# zero123 依赖通过子模块安装 (见 README)
-# kornia
-einops>=0.6.0
-rembg>=2.0.0
-onnxruntime>=1.15.0

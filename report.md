@@ -218,28 +218,3 @@ $$
 
 <br>
 <br>
-
-# 附录
-
-## A. 项目链接
-
-- **GitHub 仓库**: https://github.com/lxzhyh/Finalterm
-- **模型权重下载**: {model_weights_url}（提取码: {pwd}）
-
-## B. 参考文献
-
-[1] Kerbl, B., Kopanas, G., Leimkühler, T., & Drettakis, G. "3D Gaussian Splatting for Real-Time Radiance Field Rendering." *ACM Trans. Graph. (SIGGRAPH)*, 2023.
-
-[2] Poole, B., Jain, A., Barron, J. T., & Mildenhall, B. "DreamFusion: Text-to-3D using 2D Diffusion." *ICLR*, 2023.
-
-[3] Liu, R., Wu, R., Van Hoorick, B., Tokmakov, P., Zakharov, S., & Vondrick, C. "Zero-1-to-3: Zero-shot One Image to 3D Object." *ICCV*, 2023.
-
-[4] Schönberger, J. L., & Frahm, J. M. "Structure-from-Motion Revisited." *CVPR*, 2016.
-
-[5] Guo, Y., et al. "threestudio: A Unified Framework for 3D Content Generation." 2023.
-
-[6] Zhao, T. Z., Kumar, V., Levine, S., & Finn, C. "Learning Fine-Grained Bimanual Manipulation with Low-Cost Hardware." *RSS*, 2023.
-
-[7] Mees, O., Hermann, L., Rosete-Beas, E., & Burgard, W. "CALVIN: A Benchmark for Language-Conditioned Policy Learning for Long-Horizon Robot Manipulation Tasks." *IEEE RA-L*, 2022.
-
-[8] Cadene, R., et al. "LeRobot: Open-Source Machine Learning for Real-World Robotics." 2024.
