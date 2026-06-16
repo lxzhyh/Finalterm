@@ -1,0 +1,63 @@
+# Experiment 1: ACT trained on CALVIN Env-A only
+# Baseline single-environment policy
+
+dataset:
+  repo_id: calvin_A_train
+  root_dir: ./data/lerobot_calvin
+
+policy:
+  type: act
+  device: cuda
+  # Vision encoder
+  vision_encoder:
+    pretrained: true           # use pretrained ResNet/ViT backbone
+    freeze: false
+  # Transformer decoder
+  decoder:
+    n_decoder_layers: 4
+    n_heads: 8
+    d_model: 512
+    dim_feedforward: 3200
+    dropout: 0.1
+    activation: relu
+  # CVAE for multimodal action distribution
+  cvae:
+    latent_dim: 32
+    kl_weight: 10.0
+  # Action chunking
+  chunk_size: 100              # predict future 100 actions
+  # Input modalities
+  input_keys:
+    - observation.images.static
+    - observation.images.gripper
+    - observation.state
+  output_key: action
+
+training:
+  batch_size: 8
+  steps: 100000
+  optimizer: AdamW
+  learning_rate: 1.0e-4
+  weight_decay: 0.0
+  lr_scheduler: cosine
+  warmup_steps: 500
+  grad_clip_norm: 10.0
+  # Loss
+  loss: l1                     # Action L1 Loss
+  # Checkpoint
+  save_checkpoint: true
+  checkpoint_interval: 10000
+  save_best_metric: val_action_l1_loss
+
+logging:
+  wandb:
+    enable: true
+    project: act-calvin
+    group: exp1_env_a
+    name: act_A_only_seed42
+  log_interval: 50
+  eval_interval: 5000
+
+seed: 42
+output_dir: outputs/train/act_A_only_seed42
+job_name: act_A_only_seed42
