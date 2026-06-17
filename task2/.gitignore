@@ -24,3 +24,26 @@ wandb/
 
 # Logs
 *.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# HuggingFace / model caches
+.hf_cache/
+.cache/
+*.bin
+*.pt
+*.pth
+*.safetensors
+
+# Qoder / AI tools
+.qoder/
+
+# LaTeX auxiliary
+*.aux
+*.out
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz

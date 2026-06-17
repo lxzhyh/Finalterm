@@ -1,4 +1,52 @@
-models/
-third_party/
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data (too large for GitHub)
 data/
+models/
+*.bin
+*.pt
+*.pth
+*.safetensors
+
+# Model / HF caches
+.hf_cache/
+.cache/
 output/
+outputs/train/
+
+# AI tools
+.qoder/
+
+# Third-party
+third_party/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# WandB
+wandb/
+
+# Logs
+*.log
+
+# LaTeX auxiliary files
+*.aux
+*.out
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
