@@ -13,6 +13,7 @@
 **GitHub 仓库**: https://github.com/lxzhyh/Finalterm  
 **模型权重下载**:
 1. 3D资产模型以及实验结果：https://drive.google.com/drive/folders/1JwwIzF0aPhRCudD8SY8ltvWElJ9PGZdQ?usp=sharing
+2. ACT策略模型Checkpoints (4个模型 + 训练日志)：https://drive.google.com/drive/folders/1POTNMwUkydK9StL5FMXtqycs83G29feU?usp=sharing
 
 ---
 
