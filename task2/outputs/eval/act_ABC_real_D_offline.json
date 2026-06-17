@@ -1,0 +1,59 @@
+{
+  "experiment": "002000",
+  "checkpoint": "outputs/train/act_ABC_real_seed42/checkpoints/002000/pretrained_model",
+  "test_env": "D",
+  "eval_mode": "offline",
+  "device": "cuda",
+  "mean_action_l1": 0.340259,
+  "median_action_l1": 0.35497,
+  "position_l1": 0.268482,
+  "rotation_l1": 0.196665,
+  "gripper_error": 0.986371,
+  "chunk_boundary_delta": 1.113596,
+  "chunk_inner_variance": 0.005334,
+  "num_samples": 5000,
+  "per_dimension_error": {
+    "dx": {
+      "mean": 0.225064,
+      "std": 0.339824,
+      "min": -1.015787,
+      "max": 1.47893
+    },
+    "dy": {
+      "mean": 0.077346,
+      "std": 0.316414,
+      "min": -1.013886,
+      "max": 1.405867
+    },
+    "dz": {
+      "mean": 0.010065,
+      "std": 0.310412,
+      "min": -1.617922,
+      "max": 0.944584
+    },
+    "drx": {
+      "mean": 0.068553,
+      "std": 0.228345,
+      "min": -1.306646,
+      "max": 1.161243
+    },
+    "dry": {
+      "mean": 0.010607,
+      "std": 0.209057,
+      "min": -0.727816,
+      "max": 0.882118
+    },
+    "drz": {
+      "mean": -0.064129,
+      "std": 0.337105,
+      "min": -1.4367,
+      "max": 1.127438
+    },
+    "gripper": {
+      "mean": -0.782027,
+      "std": 1.048894,
+      "min": -2.021882,
+      "max": 1.931059
+    }
+  }
+}
