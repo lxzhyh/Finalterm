@@ -100,7 +100,7 @@ Each sample contains: static image $(3, 200, 200)$, gripper image $(3, 84, 84)$,
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{figures/dataset_stats.png}
+\includegraphics[width=\linewidth]{assets/dataset_stats.png}
 \caption{CALVIN dataset statistics overview.}
 \label{fig:dataset}
 \end{figure}
@@ -125,7 +125,7 @@ ACT~\cite{zhao2023act} is a behavior cloning algorithm with three key innovation
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{figures/act_architecture.png}
+\includegraphics[width=\linewidth]{assets/act_architecture.png}
 \caption{ACT architecture used in this work. Two image streams are encoded by pretrained ResNet-18, concatenated with the state encoding, then processed by a Transformer encoder-decoder to generate an action chunk.}
 \label{fig:arch}
 \end{figure}
@@ -195,21 +195,21 @@ We employ \textbf{offline (open-loop) evaluation}: real images and states from E
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{figures/train_loss_all_models.png}
+\includegraphics[width=\linewidth]{assets/train_loss_all_models.png}
 \caption{Training loss convergence. A-only (syn) and ABC-joint (syn) trained for 200 steps; ABC-joint (real) trained for 2,000 steps, achieving the lowest final loss of 1.090.}
 \label{fig:loss_curve}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{figures/train_loss_and_gradient_real.png}
+\includegraphics[width=\linewidth]{assets/train_loss_and_gradient_real.png}
 \caption{ABC-joint (real) training dynamics. Left: loss convergence over 2,000 steps (44.7$\to$1.1). Right: gradient norm stabilizing around 45--65 after step 500.}
 \label{fig:loss_grad}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{figures/train_loss_logscale_real.png}
+\includegraphics[width=\linewidth]{assets/train_loss_logscale_real.png}
 \caption{ABC-joint (real) training loss on log scale, showing rapid initial decrease and comparison with synthetic model final losses.}
 \label{fig:loss_log}
 \end{figure}
@@ -250,7 +250,7 @@ We employ \textbf{offline (open-loop) evaluation}: real images and states from E
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{figures/metrics_comparison.png}
+\includegraphics[width=\linewidth]{assets/metrics_comparison.png}
 \caption{Offline evaluation metrics on Env-D. Lower values indicate better performance.}
 \label{fig:metrics}
 \end{figure}
@@ -283,7 +283,7 @@ Samples & 500 & 500 & 5000 & 5000 \\
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{figures/per_dimension_error.png}
+\includegraphics[width=\linewidth]{assets/per_dimension_error.png}
 \caption{Per-dimension absolute mean error comparison.}
 \label{fig:perdim}
 \end{figure}
@@ -353,7 +353,7 @@ Chunk Boundary & 0.159 & 2.228 (+1301\%) & 1.114 (+601\%) \\
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\linewidth]{figures/chunking_analysis.png}
+\includegraphics[width=\linewidth]{assets/chunking_analysis.png}
 \caption{Action chunking smoothness analysis. Left: chunk boundary delta (L2 distance between consecutive chunks). Right: chunk inner variance (consistency within chunks).}
 \label{fig:chunking}
 \end{figure}
