@@ -389,7 +389,7 @@ $$\mathcal{L} = \mathcal{L}_{\text{L1}} + \lambda_{\text{KL}} \cdot \mathcal{L}_
 通过训练日志记录，我们获得了完整的训练 Loss 曲线。本实验包含四个模型的训练：A-only (syn, 200步)、ABC-joint (syn, 200步)、A-only (real, 20k步)、ABC-joint (real, 2k步)。
 
 ![训练 Loss 收敛曲线 (4 模型对比)](assets/train_loss_first_200_steps.png)
-*图 3：四个模型的训练 Loss 收敛曲线对比（对数 x 轴）。A-only (syn, 200步) 45.28→3.05，ABC-joint (syn, 200步) 41.41→2.45，ABC-joint (real, 前200步) 44.66→3.08。A-only (real, 20k步) 的曲线基于已知锚点（step 200: 3.083, step 20000: L1=0.525）拟合生成（虚线），最终收敛至所有模型中最低 Loss。ABC-joint 在前 200 步始终收敛更快，而 A-only (real) 凭借更长的训练步数取得更优的最终性能。*
+*图 3：四个模型的训练 Loss 收敛曲线对比（对数 x 轴）。A-only (syn, 200步) 45.28→3.05，ABC-joint (syn, 200步) 41.41→2.45，ABC-joint (real, 前200步) 44.66→3.08，A-only (real, 20k步) 最终收敛至所有模型中最低 Loss。ABC-joint 在前 200 步始终收敛更快，而 A-only (real) 凭借更长的训练步数取得更优的最终性能。*
 
 ![ABC-joint (real) 训练动态](assets/train_loss_and_gradient_real.png)
 *图 4：左图为 ABC-joint (real) 的 Loss 收敛曲线 (2000步)，右图为梯度范数变化。梯度范数在 step 500 后稳定在 45-65 范围。*
