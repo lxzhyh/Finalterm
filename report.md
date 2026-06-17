@@ -7,7 +7,7 @@
 | 姓名 | 学号 |
 |---|---|
 | 张天翼 | 25110980028 |
-| {name_2} | {id_2} |
+| 王煜祥 | 25210980109 |
 | {name_3} | {id_3} |
 
 **GitHub 仓库**: https://github.com/lxzhyh/Finalterm  
@@ -387,8 +387,8 @@ $$\mathcal{L} = \mathcal{L}_{\text{L1}} + \lambda_{\text{KL}} \cdot \mathcal{L}_
 
 通过训练日志记录，我们获得了完整的训练 Loss 曲线。本实验包含四个模型的训练：A-only (syn, 200步)、ABC-joint (syn, 200步)、A-only (real, 20k步)、ABC-joint (real, 2k步)。
 
-![训练 Loss 对比](assets/train_loss_all_models.png)
-*图 3：训练 Loss 收敛曲线对比。ABC-joint (real) 在 2000 步训练中从 44.66 降至 1.09，取得所有模型中最低的最终 Loss。*
+![训练 Loss 对比 (前 200 步公平对比)](assets/train_loss_first_200_steps.png)
+*图 3：前 200 步训练 Loss 收敛曲线（公平对比）。A-only (syn) 45.28→3.05，ABC-joint (syn) 41.41→2.45，ABC-joint (real, 2k 步训练的前 200 步) 44.66→3.08。ABC-joint 在多环境数据下始终收敛更快。注：A-only (real, 20k) 早期日志未留存，未显示于此图；其 200 步 Loss 为 3.083（见下表），与 ABC-joint (real) 接近。*
 
 ![ABC-joint (real) 训练动态](assets/train_loss_and_gradient_real.png)
 *图 4：左图为 ABC-joint (real) 的 Loss 收敛曲线 (2000步)，右图为梯度范数变化。梯度范数在 step 500 后稳定在 45-65 范围。*

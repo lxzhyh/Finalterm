@@ -15,6 +15,9 @@ models/
 *.pt
 *.pth
 *.safetensors
+*.tar.gz
+*.tgz
+*.zip
 
 # Model / HF caches
 .hf_cache/
