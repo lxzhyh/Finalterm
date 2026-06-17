@@ -22,7 +22,7 @@ plt.rcParams.update({
     "grid.alpha": 0.3,
 })
 
-OUTPUT_DIR = Path("/mnt/workspace/kgg2/wangyuxiang/Finalterm/task2/reports/figures")
+OUTPUT_DIR = Path("/mnt/workspace/kgg2/wangyuxiang/Finalterm/assets")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ---- Load eval data ----
@@ -236,7 +236,8 @@ def plot_architecture():
     arrow_pairs = [
         ("static_img", "cnn1"), ("gripper_img", "cnn2"), ("state", "state_enc"),
         ("cnn1", "concat"), ("cnn2", "concat"), ("state_enc", "concat"),
-        ("concat", "transformer"), ("transformer", "cvae_dec"), ("cvae_dec", "output"),
+        ("concat", "cvae_enc"), ("concat", "transformer"),
+        ("cvae_enc", "cvae_dec"), ("transformer", "cvae_dec"), ("cvae_dec", "output"),
     ]
 
     for src, dst in arrow_pairs:
