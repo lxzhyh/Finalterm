@@ -1,0 +1,29 @@
+# Paths are relative to task1/fusion when run from this directory.
+background:
+  model_dir: ../background/output/garden
+  ply: ../background/output/garden/point_cloud/iteration_30000/point_cloud.ply
+  scale: 1.0
+  rotation_deg: [0.0, 0.0, 0.0]
+  translation: [0.0, 0.0, 0.0]
+
+objects:
+  - name: object_a_real_3dgs
+    enabled: true
+    ply: output/object_a_gaussians.ply
+    scale: 1.0
+    rotation_deg: [0.0, 0.0, 0.0]
+    translation: [-0.85, 1.95, 0.15]
+
+  - name: object_b_text_to_3d
+    enabled: true
+    ply: output/object_b_gaussians.ply
+    scale: 1.0
+    rotation_deg: [0.0, 0.0, 0.0]
+    translation: [0.0, 1.95, 0.15]
+
+  - name: object_c_image_to_3d
+    enabled: true
+    ply: output/object_c_gaussians.ply
+    scale: 1.0
+    rotation_deg: [0.0, 0.0, 0.0]
+    translation: [0.85, 1.95, 0.15]

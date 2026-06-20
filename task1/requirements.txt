@@ -11,6 +11,7 @@ trimesh>=3.21.0
 plyfile>=0.9
 scipy>=1.10.0
 omegaconf>=2.3.0
+PyYAML>=6.0
 
 # 3dgs 通过子模块装，这里不列
 einops>=0.6.0
